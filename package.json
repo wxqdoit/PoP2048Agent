@@ -1,0 +1,19 @@
+{
+  "name": "pop2048-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node server.mjs",
+    "start": "node server.mjs",
+    "check": "node scripts/smoke-test.mjs"
+  },
+  "dependencies": {
+    "@filoz/synapse-sdk": "^1.0.1",
+    "viem": "^2.54.1"
+  },
+  "overrides": {
+    "ws": "8.21.0"
+  },
+  "devDependencies": {}
+}
