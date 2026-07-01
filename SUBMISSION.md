@@ -10,9 +10,17 @@ Each turn creates an agent recommendation and a player decision record. The arch
 
 ## Filecoin usage
 
-The server uses the Synapse SDK to upload the proof package:
+The browser uses the connected wallet and Synapse SDK to upload the proof package:
 
 ```js
+const synapse = Synapse.create({
+  account: address,
+  chain: calibration,
+  transport: custom(window.ethereum),
+  source: 'pop2048-agent',
+  withCDN: false
+});
+
 const preflight = await synapse.storage.prepare({
   dataSize: BigInt(bytes.byteLength)
 });
@@ -29,9 +37,9 @@ const downloaded = await synapse.storage.download({ pieceCid });
 ## AI build log
 
 - Selected a game mechanic that makes Filecoin visible as a proof key, not background storage.
-- Implemented a local expectimax-style 2048 agent to keep the demo deterministic and keyless.
+- Implemented a local expectimax-style 2048 agent to keep the gameplay fast and deterministic.
 - Added an archive envelope with digest, session metadata, move logs, and Agent recommendation traces.
-- Kept the Synapse private key on the server and exposed only archive/retrieve endpoints to the browser.
+- Removed the server path and moved Synapse usage into the browser wallet flow, so the app can run from GitHub Pages.
 
 ## 60 second demo
 
@@ -40,6 +48,6 @@ const downloaded = await synapse.storage.download({ pieceCid });
 3. Make one manual move.
 4. Press `AI` to follow the agent.
 5. Show the session log and digest.
-6. Click `Archive proof` and show the PieceCID.
-7. Paste the PieceCID into retrieve and load the stored proof.
-
+6. Connect wallet.
+7. Click `Archive proof` and show the PieceCID.
+8. Paste the PieceCID into retrieve and load the stored proof.

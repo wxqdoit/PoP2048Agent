@@ -1,5 +1,12 @@
 import { addRandomTile, cloneBoard, createInitialBoard, flattenBoard, isGameOver, moveBoard } from './game2048.js';
 import { recommendMove } from './agent.js';
+import {
+  archiveProofWithWallet,
+  connectFilecoinWallet,
+  filecoinChain,
+  retrieveProofWithWallet,
+  walletAvailable
+} from './filecoin.js';
 
 const boardEl = document.querySelector('#board');
 const scoreValue = document.querySelector('#scoreValue');
@@ -11,23 +18,19 @@ const agentReason = document.querySelector('#agentReason');
 const agentMetrics = document.querySelector('#agentMetrics');
 const agentMoveButton = document.querySelector('#agentMoveButton');
 const newGameButton = document.querySelector('#newGameButton');
+const connectWalletButton = document.querySelector('#connectWalletButton');
 const archiveButton = document.querySelector('#archiveButton');
 const retrieveButton = document.querySelector('#retrieveButton');
 const pieceCidInput = document.querySelector('#pieceCidInput');
 const storageMode = document.querySelector('#storageMode');
 const storageStatus = document.querySelector('#storageStatus');
+const walletAddress = document.querySelector('#walletAddress');
 const receipt = document.querySelector('#receipt');
 const digestShort = document.querySelector('#digestShort');
 const themeToggle = document.querySelector('#themeToggle');
 
 const bestStorageKey = 'pop2048.bestScore';
 const themeStorageKey = 'pop2048.theme';
-const apiPaths = {
-  status: 'api/status',
-  archive: 'api/archive',
-  retrieve: (pieceCid) => `api/retrieve?pieceCid=${encodeURIComponent(pieceCid)}`
-};
-const isGitHubPagesHost = window.location.hostname.endsWith('.github.io');
 
 const state = {
   sessionId: crypto.randomUUID(),
@@ -38,7 +41,7 @@ const state = {
   moves: [],
   recommendation: null,
   gameOver: false,
-  storage: null,
+  wallet: null,
   lastDigest: null
 };
 
@@ -148,6 +151,7 @@ async function renderDigest() {
 
 function renderReceipt(data) {
   receipt.hidden = false;
+  const copyText = data.copies?.length ? `${data.copies.length}/${data.requestedCopies}` : '-';
   receipt.innerHTML = `
     <span>PieceCID</span>
     <code>${data.pieceCid}</code>
@@ -155,16 +159,63 @@ function renderReceipt(data) {
     <code>${data.digest}</code>
     <span>Bytes</span>
     <code>${data.bytes}</code>
+    <span>Copies</span>
+    <code>${copyText}${data.complete ? ' complete' : ' partial'}</code>
   `;
   pieceCidInput.value = data.pieceCid;
 }
 
-async function readJsonResponse(response) {
-  const contentType = response.headers.get('content-type') || '';
-  if (!contentType.includes('application/json')) {
-    throw new Error(`Archive API returned HTTP ${response.status}.`);
+function renderRetrievedProof(data) {
+  receipt.hidden = false;
+  receipt.innerHTML = `
+    <span>Retrieved</span>
+    <code>${data.pieceCid}</code>
+    <span>Stored digest</span>
+    <code>${data.digest || 'not included'}</code>
+    <span>Archived</span>
+    <code>${data.archivedAt || 'not included'}</code>
+  `;
+}
+
+function shortAddress(address) {
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
+function setWalletDisconnected(message) {
+  state.wallet = null;
+  storageMode.textContent = walletAvailable() ? 'Wallet ready' : 'Wallet required';
+  storageStatus.textContent = message;
+  walletAddress.textContent = 'Not connected';
+  connectWalletButton.disabled = !walletAvailable();
+  archiveButton.disabled = true;
+  retrieveButton.disabled = true;
+}
+
+function setWalletConnected(connection) {
+  state.wallet = connection;
+  storageMode.textContent = 'Wallet connected';
+  storageStatus.textContent = `${connection.chain.name} ready for Synapse storage.`;
+  walletAddress.textContent = shortAddress(connection.address);
+  connectWalletButton.textContent = 'Reconnect wallet';
+  connectWalletButton.disabled = false;
+  archiveButton.disabled = false;
+  retrieveButton.disabled = false;
+}
+
+async function connectWallet() {
+  connectWalletButton.disabled = true;
+  connectWalletButton.textContent = 'Connecting';
+  storageStatus.textContent = `Requesting ${filecoinChain.name} wallet connection.`;
+
+  try {
+    const connection = await connectFilecoinWallet();
+    setWalletConnected(connection);
+  } catch (error) {
+    setWalletDisconnected(error.message);
+  } finally {
+    connectWalletButton.textContent = state.wallet ? 'Reconnect wallet' : 'Connect wallet';
+    connectWalletButton.disabled = !walletAvailable();
   }
-  return response.json();
 }
 
 async function render() {
@@ -224,9 +275,9 @@ async function newGame() {
 }
 
 async function archiveProof() {
-  if (!state.storage?.apiAvailable) {
+  if (!state.wallet?.synapse) {
     receipt.hidden = false;
-    receipt.innerHTML = '<span>Status</span><code>Archive API is not hosted on GitHub Pages.</code>';
+    receipt.innerHTML = '<span>Status</span><code>Connect wallet first.</code>';
     return;
   }
 
@@ -237,22 +288,26 @@ async function archiveProof() {
   const digest = await sha256(JSON.stringify(proof));
 
   try {
-    const response = await fetch(apiPaths.archive, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ proof, digest })
+    const data = await archiveProofWithWallet({
+      synapse: state.wallet.synapse,
+      proof,
+      digest,
+      callbacks: {
+        onStatus: (message) => {
+          storageStatus.textContent = message;
+        },
+        onUploadProgress: (bytesUploaded, totalBytes) => {
+          storageStatus.textContent = `Uploading ${bytesUploaded}/${totalBytes} bytes.`;
+        }
+      }
     });
-    const data = await readJsonResponse(response);
-    if (!response.ok) {
-      throw new Error(data.message || data.error || 'Archive failed');
-    }
     renderReceipt(data);
     storageStatus.textContent = `Archived on ${data.chain}.`;
   } catch (error) {
     receipt.hidden = false;
     receipt.innerHTML = `<span>Status</span><code>${error.message}</code>`;
   } finally {
-    archiveButton.disabled = false;
+    archiveButton.disabled = !state.wallet?.synapse;
     archiveButton.textContent = 'Archive proof';
   }
 }
@@ -260,64 +315,33 @@ async function archiveProof() {
 async function retrieveProof() {
   const pieceCid = pieceCidInput.value.trim();
   if (!pieceCid) return;
-  if (!state.storage?.apiAvailable) {
+  if (!state.wallet?.synapse) {
     receipt.hidden = false;
-    receipt.innerHTML = '<span>Status</span><code>Retrieve API is not hosted on GitHub Pages.</code>';
+    receipt.innerHTML = '<span>Status</span><code>Connect wallet first.</code>';
     return;
   }
 
   retrieveButton.disabled = true;
   retrieveButton.textContent = 'Retrieving';
   try {
-    const response = await fetch(apiPaths.retrieve(pieceCid));
-    const data = await readJsonResponse(response);
-    if (!response.ok) {
-      throw new Error(data.message || data.error || 'Retrieve failed');
-    }
-    receipt.hidden = false;
-    receipt.innerHTML = `
-      <span>Retrieved</span>
-      <code>${pieceCid}</code>
-      <span>Stored digest</span>
-      <code>${data.digest || 'not included'}</code>
-    `;
+    const data = await retrieveProofWithWallet(state.wallet.synapse, pieceCid);
+    renderRetrievedProof(data);
   } catch (error) {
     receipt.hidden = false;
     receipt.innerHTML = `<span>Status</span><code>${error.message}</code>`;
   } finally {
-    retrieveButton.disabled = false;
+    retrieveButton.disabled = !state.wallet?.synapse;
     retrieveButton.textContent = 'Retrieve proof';
   }
 }
 
 async function loadStorageStatus() {
-  if (isGitHubPagesHost) {
-    state.storage = { apiAvailable: false, synapseConfigured: false };
-    storageMode.textContent = 'Static page';
-    storageStatus.textContent = 'GitHub Pages hosts the game UI only.';
-    archiveButton.disabled = true;
-    retrieveButton.disabled = true;
+  if (!walletAvailable()) {
+    setWalletDisconnected('Install a browser wallet to archive proof on Filecoin.');
     return;
   }
 
-  try {
-    const response = await fetch(apiPaths.status);
-    const data = await readJsonResponse(response);
-    if (!response.ok) {
-      throw new Error(data.message || data.error || 'Archive API is unavailable.');
-    }
-    state.storage = { ...data, apiAvailable: true };
-    storageMode.textContent = data.synapseConfigured ? 'Synapse live' : 'Not configured';
-    storageStatus.textContent = data.synapseConfigured
-      ? `${data.chain} archive endpoint is ready.`
-      : 'Set SYNAPSE_PRIVATE_KEY on the server.';
-  } catch {
-    state.storage = { apiAvailable: false, synapseConfigured: false };
-    storageMode.textContent = 'Static page';
-    storageStatus.textContent = 'GitHub Pages hosts the game UI only.';
-    archiveButton.disabled = true;
-    retrieveButton.disabled = true;
-  }
+  setWalletDisconnected(`Connect wallet to use ${filecoinChain.name}.`);
 }
 
 function bindEvents() {
@@ -329,6 +353,7 @@ function bindEvents() {
     if (direction) applyMove(direction, 'agent');
   });
   newGameButton.addEventListener('click', newGame);
+  connectWalletButton.addEventListener('click', connectWallet);
   archiveButton.addEventListener('click', archiveProof);
   retrieveButton.addEventListener('click', retrieveProof);
   themeToggle.addEventListener('click', () => {
@@ -353,6 +378,15 @@ function bindEvents() {
     event.preventDefault();
     applyMove(direction);
   });
+
+  if (window.ethereum?.on) {
+    window.ethereum.on('accountsChanged', () => {
+      setWalletDisconnected('Wallet account changed. Connect wallet again.');
+    });
+    window.ethereum.on('chainChanged', () => {
+      setWalletDisconnected('Wallet network changed. Connect wallet again.');
+    });
+  }
 }
 
 applySavedTheme();

@@ -4,9 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node server.mjs",
-    "start": "node server.mjs",
-    "check": "node scripts/smoke-test.mjs"
+    "dev": "vite --host 127.0.0.1 --port 8787",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 8788",
+    "check": "node scripts/smoke-test.mjs && npm run build"
   },
   "dependencies": {
     "@filoz/synapse-sdk": "^1.0.1",
@@ -15,5 +16,7 @@
   "overrides": {
     "ws": "8.21.0"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "vite": "^7.0.0"
+  }
 }

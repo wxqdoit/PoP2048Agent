@@ -7,7 +7,7 @@ The product mechanic is simple: play 2048, let the agent recommend moves, and ar
 ## Live page
 
 - GitHub Pages: https://wxqdoit.github.io/PoP2048Agent/
-- The GitHub Pages deployment hosts the playable game UI. Live Filecoin archive and retrieval require the Node server described below.
+- The GitHub Pages deployment is the full app. Filecoin archive and retrieval run in the browser through the user's wallet.
 
 ## What it demonstrates
 
@@ -24,27 +24,10 @@ npm run dev
 
 Open `http://127.0.0.1:8787`.
 
-## Enable live Filecoin archive
+## Use live Filecoin archive
 
-Create `.env` values in the hosting environment:
-
-```sh
-SYNAPSE_PRIVATE_KEY=0x...
-SYNAPSE_CHAIN=calibration
-SYNAPSE_SOURCE=pop2048-agent
-```
-
-Then run:
-
-```sh
-npm run dev
-```
-
-The server keeps the private key outside the browser and exposes:
-
-- `GET /api/status`
-- `POST /api/archive`
-- `GET /api/retrieve?pieceCid=...`
+Use a browser wallet that exposes `window.ethereum` and can switch to Filecoin Calibration.
+The app requests the wallet account, creates a Synapse SDK client with `custom(window.ethereum)`, prepares storage payment, uploads the proof package, and displays the returned PieceCID.
 
 ## Verify
 
@@ -52,7 +35,7 @@ The server keeps the private key outside the browser and exposes:
 npm run check
 ```
 
-The smoke test validates 2048 merge logic, agent recommendation output, the static app route, `/api/status`, and the archive endpoint behavior with or without `SYNAPSE_PRIVATE_KEY`.
+The smoke test validates 2048 merge logic, agent recommendation output, Filecoin Calibration configuration, and the production Vite build.
 
 ## Demo flow
 
@@ -60,11 +43,13 @@ The smoke test validates 2048 merge logic, agent recommendation output, the stat
 2. Make a player move and show whether it matched the agent.
 3. Use the `AI` control for one agent-selected move.
 4. Show the session log and digest.
-5. Archive proof, then copy the returned PieceCID.
-6. Retrieve the proof by PieceCID.
+5. Connect wallet.
+6. Archive proof, then copy the returned PieceCID.
+7. Retrieve the proof by PieceCID.
 
 ## Performance notes
 
 - The agent uses a fixed depth-2 search over a 4x4 board and memoizes evaluated board states per turn.
-- Archive payloads are capped at 256 KB on the server.
+- Archive payloads are capped at 256 KB before the wallet upload begins.
 - Rendering updates 16 stable grid cells, so each turn avoids layout churn from rebuilding the full page.
+- The production bundle is generated with Vite and served as static files from `docs/`.

@@ -114,6 +114,11 @@ button:disabled {
   color: var(--ink);
 }
 
+.button + .button,
+.wallet-address + .button {
+  margin-top: 10px;
+}
+
 .icon-button {
   min-width: 44px;
   padding: 0;
@@ -303,6 +308,19 @@ button:disabled {
   margin-bottom: 10px;
 }
 
+.wallet-address {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+  padding: 9px 10px;
+  color: var(--ink);
+  font-size: 0.82rem;
+}
+
 .cid-field input {
   width: 100%;
   min-height: 42px;
@@ -378,4 +396,3 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 }
-
