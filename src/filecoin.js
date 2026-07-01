@@ -56,10 +56,6 @@ function chainParams(chain) {
   };
 }
 
-export function walletAvailable() {
-  return Boolean(window.ethereum);
-}
-
 async function ensureChain(provider, chain) {
   const targetChainId = toHexChainId(chain);
   const currentChainId = await provider.request({ method: 'eth_chainId' });
@@ -79,19 +75,15 @@ async function ensureChain(provider, chain) {
   }
 }
 
-export async function connectFilecoinWallet() {
-  if (!walletAvailable()) {
-    throw new Error('Browser wallet not found.');
+export async function createSynapseFromProvider({ provider, address }) {
+  if (!provider?.request) {
+    throw new Error('Reown wallet provider is not connected.');
+  }
+  if (!address) {
+    throw new Error('Wallet address is not connected.');
   }
 
-  const provider = window.ethereum;
-  await provider.request({ method: 'eth_requestAccounts' });
   await ensureChain(provider, filecoinChain);
-  const accounts = await provider.request({ method: 'eth_accounts' });
-  const address = accounts?.[0];
-  if (!address) {
-    throw new Error('Wallet account not connected.');
-  }
 
   const [{ Synapse, calibration }, { custom }] = await Promise.all([
     import('@filoz/synapse-sdk'),
@@ -106,7 +98,7 @@ export async function connectFilecoinWallet() {
     withCDN: false
   });
 
-  return { address, chain: calibration, synapse };
+  return synapse;
 }
 
 function proofBytes(proof, digest) {

@@ -7,7 +7,7 @@ The product mechanic is simple: play 2048, let the agent recommend moves, and ar
 ## Live page
 
 - GitHub Pages: https://wxqdoit.github.io/PoP2048Agent/
-- The GitHub Pages deployment is the full app. Filecoin archive and retrieval run in the browser through the user's wallet.
+- The GitHub Pages deployment is a static frontend app. Wallet connection requires a valid `VITE_REOWN_PROJECT_ID` at build time.
 
 ## What it demonstrates
 
@@ -19,15 +19,17 @@ The product mechanic is simple: play 2048, let the agent recommend moves, and ar
 
 ```sh
 npm install
+cp .env.example .env
 npm run dev
 ```
 
 Open `http://127.0.0.1:8787`.
 
+Set `VITE_REOWN_PROJECT_ID` in `.env` using a Project ID from Reown Dashboard before testing wallet connection or rebuilding the GitHub Pages bundle.
+
 ## Use live Filecoin archive
 
-Use a browser wallet that exposes `window.ethereum` and can switch to Filecoin Calibration.
-The app requests the wallet account, creates a Synapse SDK client with `custom(window.ethereum)`, prepares storage payment, uploads the proof package, and displays the returned PieceCID.
+The app uses Reown AppKit with the Wagmi adapter on Filecoin Calibration. Reown provides the EIP-155 wallet provider, the app creates a Synapse SDK client with that provider, prepares storage payment, uploads the proof package, and displays the returned PieceCID.
 
 ## Verify
 
@@ -35,15 +37,15 @@ The app requests the wallet account, creates a Synapse SDK client with `custom(w
 npm run check
 ```
 
-The smoke test validates 2048 merge logic, agent recommendation output, Filecoin Calibration configuration, and the production Vite build.
+The smoke test validates 2048 merge logic, agent recommendation output, Filecoin Calibration configuration, and the production Vite/React build.
 
 ## Demo flow
 
 1. Open the board and show the initial agent recommendation.
 2. Make a player move and show whether it matched the agent.
-3. Use the `AI` control for one agent-selected move.
+3. Use the agent icon control for one agent-selected move.
 4. Show the session log and digest.
-5. Connect wallet.
+5. Connect wallet after building with a valid Reown Project ID.
 6. Archive proof, then copy the returned PieceCID.
 7. Retrieve the proof by PieceCID.
 
@@ -51,5 +53,6 @@ The smoke test validates 2048 merge logic, agent recommendation output, Filecoin
 
 - The agent uses a fixed depth-2 search over a 4x4 board and memoizes evaluated board states per turn.
 - Archive payloads are capped at 256 KB before the wallet upload begins.
-- Rendering updates 16 stable grid cells, so each turn avoids layout churn from rebuilding the full page.
+- React updates 16 stable grid cells, so each turn keeps layout work bounded.
+- Reown is lazy-loaded behind the wallet panel; the game remains lightweight before wallet setup.
 - The production bundle is generated with Vite and served as static files from `docs/`.

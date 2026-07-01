@@ -10,13 +10,15 @@ Each turn creates an agent recommendation and a player decision record. The arch
 
 ## Filecoin usage
 
-The browser uses the connected wallet and Synapse SDK to upload the proof package:
+The browser uses Reown AppKit, Wagmi, and Synapse SDK to upload the proof package. A valid `VITE_REOWN_PROJECT_ID` from Reown Dashboard must be set before building a wallet-enabled demo:
 
 ```js
+const { walletProvider } = useAppKitProvider('eip155');
+
 const synapse = Synapse.create({
   account: address,
   chain: calibration,
-  transport: custom(window.ethereum),
+  transport: custom(walletProvider),
   source: 'pop2048-agent',
   withCDN: false
 });
@@ -40,6 +42,7 @@ const downloaded = await synapse.storage.download({ pieceCid });
 - Implemented a local expectimax-style 2048 agent to keep the gameplay fast and deterministic.
 - Added an archive envelope with digest, session metadata, move logs, and Agent recommendation traces.
 - Removed the server path and moved Synapse usage into the browser wallet flow, so the app can run from GitHub Pages.
+- Refactored the UI to Vite, React, Tailwind, shadcn-style primitives, and Reown AppKit wallet connection.
 
 ## 60 second demo
 
@@ -48,6 +51,6 @@ const downloaded = await synapse.storage.download({ pieceCid });
 3. Make one manual move.
 4. Press `AI` to follow the agent.
 5. Show the session log and digest.
-6. Connect wallet.
+6. Connect wallet after building with a valid Reown Project ID.
 7. Click `Archive proof` and show the PieceCID.
 8. Paste the PieceCID into retrieve and load the stored proof.
