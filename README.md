@@ -4,6 +4,11 @@ Proof-of-Play 2048 with a local AI agent and Filecoin archive receipts.
 
 The product mechanic is simple: play 2048, let the agent recommend moves, and archive the full play log as a Filecoin proof package through the Synapse SDK. The PieceCID becomes the shareable proof-of-play key.
 
+## Live page
+
+- GitHub Pages: https://wxqdoit.github.io/PoP2048Agent/
+- The GitHub Pages deployment hosts the playable game UI. Live Filecoin archive and retrieval require the Node server described below.
+
 ## What it demonstrates
 
 - Agent: a local expectimax-style 2048 coach that evaluates legal moves, explains the recommendation, and records whether the player followed it.
@@ -63,4 +68,3 @@ The smoke test validates 2048 merge logic, agent recommendation output, the stat
 - The agent uses a fixed depth-2 search over a 4x4 board and memoizes evaluated board states per turn.
 - Archive payloads are capped at 256 KB on the server.
 - Rendering updates 16 stable grid cells, so each turn avoids layout churn from rebuilding the full page.
-

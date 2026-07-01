@@ -22,6 +22,12 @@ const themeToggle = document.querySelector('#themeToggle');
 
 const bestStorageKey = 'pop2048.bestScore';
 const themeStorageKey = 'pop2048.theme';
+const apiPaths = {
+  status: 'api/status',
+  archive: 'api/archive',
+  retrieve: (pieceCid) => `api/retrieve?pieceCid=${encodeURIComponent(pieceCid)}`
+};
+const isGitHubPagesHost = window.location.hostname.endsWith('.github.io');
 
 const state = {
   sessionId: crypto.randomUUID(),
@@ -153,6 +159,14 @@ function renderReceipt(data) {
   pieceCidInput.value = data.pieceCid;
 }
 
+async function readJsonResponse(response) {
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    throw new Error(`Archive API returned HTTP ${response.status}.`);
+  }
+  return response.json();
+}
+
 async function render() {
   renderBoard();
   renderScores();
@@ -210,6 +224,12 @@ async function newGame() {
 }
 
 async function archiveProof() {
+  if (!state.storage?.apiAvailable) {
+    receipt.hidden = false;
+    receipt.innerHTML = '<span>Status</span><code>Archive API is not hosted on GitHub Pages.</code>';
+    return;
+  }
+
   archiveButton.disabled = true;
   archiveButton.textContent = 'Archiving';
   receipt.hidden = true;
@@ -217,12 +237,12 @@ async function archiveProof() {
   const digest = await sha256(JSON.stringify(proof));
 
   try {
-    const response = await fetch('/api/archive', {
+    const response = await fetch(apiPaths.archive, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ proof, digest })
     });
-    const data = await response.json();
+    const data = await readJsonResponse(response);
     if (!response.ok) {
       throw new Error(data.message || data.error || 'Archive failed');
     }
@@ -240,11 +260,17 @@ async function archiveProof() {
 async function retrieveProof() {
   const pieceCid = pieceCidInput.value.trim();
   if (!pieceCid) return;
+  if (!state.storage?.apiAvailable) {
+    receipt.hidden = false;
+    receipt.innerHTML = '<span>Status</span><code>Retrieve API is not hosted on GitHub Pages.</code>';
+    return;
+  }
+
   retrieveButton.disabled = true;
   retrieveButton.textContent = 'Retrieving';
   try {
-    const response = await fetch(`/api/retrieve?pieceCid=${encodeURIComponent(pieceCid)}`);
-    const data = await response.json();
+    const response = await fetch(apiPaths.retrieve(pieceCid));
+    const data = await readJsonResponse(response);
     if (!response.ok) {
       throw new Error(data.message || data.error || 'Retrieve failed');
     }
@@ -265,13 +291,33 @@ async function retrieveProof() {
 }
 
 async function loadStorageStatus() {
-  const response = await fetch('/api/status');
-  const data = await response.json();
-  state.storage = data;
-  storageMode.textContent = data.synapseConfigured ? 'Synapse live' : 'Not configured';
-  storageStatus.textContent = data.synapseConfigured
-    ? `${data.chain} archive endpoint is ready.`
-    : 'Set SYNAPSE_PRIVATE_KEY on the server.';
+  if (isGitHubPagesHost) {
+    state.storage = { apiAvailable: false, synapseConfigured: false };
+    storageMode.textContent = 'Static page';
+    storageStatus.textContent = 'GitHub Pages hosts the game UI only.';
+    archiveButton.disabled = true;
+    retrieveButton.disabled = true;
+    return;
+  }
+
+  try {
+    const response = await fetch(apiPaths.status);
+    const data = await readJsonResponse(response);
+    if (!response.ok) {
+      throw new Error(data.message || data.error || 'Archive API is unavailable.');
+    }
+    state.storage = { ...data, apiAvailable: true };
+    storageMode.textContent = data.synapseConfigured ? 'Synapse live' : 'Not configured';
+    storageStatus.textContent = data.synapseConfigured
+      ? `${data.chain} archive endpoint is ready.`
+      : 'Set SYNAPSE_PRIVATE_KEY on the server.';
+  } catch {
+    state.storage = { apiAvailable: false, synapseConfigured: false };
+    storageMode.textContent = 'Static page';
+    storageStatus.textContent = 'GitHub Pages hosts the game UI only.';
+    archiveButton.disabled = true;
+    retrieveButton.disabled = true;
+  }
 }
 
 function bindEvents() {
@@ -315,4 +361,3 @@ bindEvents();
 refreshAgent();
 await loadStorageStatus();
 await render();
-
